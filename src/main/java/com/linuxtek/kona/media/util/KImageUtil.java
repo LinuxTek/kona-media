@@ -161,7 +161,8 @@ public class KImageUtil {
         return Scalr.resize(src, targetWidth, targetHeight, (BufferedImageOp[])null); 
     }
 
-    public static byte[] resize(byte[] src, int targetWidth, 
+    // return data, width, height
+    public static Image resize(byte[] src, int targetWidth, 
             int targetHeight) throws IOException {
         ByteArrayInputStream is = new ByteArrayInputStream(src);
 
@@ -180,7 +181,8 @@ public class KImageUtil {
 
         is.close();
         os.close();
-        return (resultBytes);
+        
+        return toImage(resultBytes);
     }
     
     public static class Image implements Serializable {
@@ -227,27 +229,26 @@ public class KImageUtil {
             newWidth = (int)(width * ratio);
 		}
         
+		Image image = null;
+
 		if (newWidth>0 && newHeight>0) {
-			src = resize(src, newWidth, newHeight);
-            /*
-            file.setData(bytes);
-            file.setWidth(newWidth);
-            file.setHeight(newHeight);
-            file.setSize(Long.valueOf(bytes.length));
-            */
+			image = resize(src, newWidth, newHeight);
+		} else {
+		    image = toImage(src);
 		}
         
         logger.debug("resizeToMaxWidthAndHeight: " 
         		+ "\nwidth: " + width
         		+ "\nheight: " + height
-        		+ "\nnewWidth: " + newWidth
-        		+ "\nnewHeight: " + newHeight);
+        		+ "\nnewWidth: " + image.width
+        		+ "\nnewHeight: " + image.height);
         
-        return toImage(src);
+        return image;
 	}
     
     public static Image toImage(byte[] data) throws IOException {
         Image image = new Image();
+
         KImageInfo info = new KImageInfo(data);
         image.data = data;
         image.width = info.getWidth();
@@ -255,6 +256,7 @@ public class KImageUtil {
         image.bitsPerPixel = info.getBitsPerPixel();
         image.contentType = info.getMimeType();
         image.size = Long.valueOf(data.length);
+
         return image;
     }
     
