@@ -135,11 +135,28 @@ public class KImageUtil {
         return t;
     }
     
+    
+    protected static BufferedImage createOptimalImage(BufferedImage src,
+            int width, int height) throws IllegalArgumentException {
+        if (width < 0 || height < 0)
+            throw new IllegalArgumentException("width [" + width
+                    + "] and height [" + height + "] must be >= 0");
+
+        return new BufferedImage(
+                width,
+                height,
+                (src.getTransparency() == Transparency.OPAQUE ? BufferedImage.TYPE_INT_RGB
+                        : BufferedImage.TYPE_INT_ARGB));
+    }
+
     public static BufferedImage transformImage(BufferedImage image, AffineTransform transform) {
 
+
+        /*
         AffineTransformOp op = new AffineTransformOp(transform, AffineTransformOp.TYPE_BICUBIC);
 
-        BufferedImage destinationImage = op.createCompatibleDestImage(image, (image.getType() == BufferedImage.TYPE_BYTE_GRAY) ? image.getColorModel() : null );
+        //BufferedImage destinationImage = op.createCompatibleDestImage(image, (image.getType() == BufferedImage.TYPE_BYTE_GRAY) ? null : image.getColorModel());
+        BufferedImage destinationImage = op.createCompatibleDestImage(image, (image.getType() == BufferedImage.TYPE_BYTE_GRAY) ? null : image.getColorModel());
 
         Graphics2D g = destinationImage.createGraphics();
 
@@ -148,10 +165,42 @@ public class KImageUtil {
         //g.setBackground(transparent);
 
         g.clearRect(0, 0, destinationImage.getWidth(), destinationImage.getHeight());
+        */
+        
+        /*
+        BufferedImage destinationImage = scaleCanvas(image, image.getWidth(), image.getHeight());
 
         destinationImage = op.filter(image, destinationImage);
 
         return destinationImage;
+        */
+        
+            /*
+        int type = (image.getTransparency() == Transparency.OPAQUE) ?
+                BufferedImage.TYPE_INT_RGB : BufferedImage.TYPE_INT_ARGB;
+        
+        BufferedImage after = new BufferedImage(image.getWidth(), image.getHeight(), type);
+        */
+        
+        /*
+        BufferedImage after = op.filter(image, null);
+        return after;
+        */
+        
+        // Create our target image we will render the rotated result to.
+        BufferedImage result = createOptimalImage(image, image.getWidth(), image.getHeight());
+        Graphics2D g2d = (Graphics2D) result.createGraphics();
+
+        /*
+         * Render the resultant image to our new rotatedImage buffer, applying
+         * the AffineTransform that we calculated above during rendering so the
+         * pixels from the old position are transposed to the new positions in
+         * the resulting image correctly.
+         */
+        g2d.drawImage(image, transform, null);
+        g2d.dispose();
+        
+        return result;
     }
  
     
@@ -219,7 +268,7 @@ public class KImageUtil {
         return ret;
     }
 
-    public BufferedImage scaleCanvas(BufferedImage source,
+    public static BufferedImage scaleCanvas(BufferedImage source,
             Integer width, Integer height) {
         logger.debug("scaling canvas to: " + width + "x" + height);
 
