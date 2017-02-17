@@ -11,7 +11,6 @@
 		<compiler.version>1.8</compiler.version>
 	</properties>
 
-
 	<dependencies>
 		<!-- Kona Libs -->
 		<dependency>
@@ -25,7 +24,15 @@
 			<artifactId>imgscalr-lib</artifactId>
 			<version>4.2</version>
 		</dependency>
+
+		<!-- https://mvnrepository.com/artifact/net.coobird/thumbnailator -->
+		<dependency>
+    		<groupId>net.coobird</groupId>
+    		<artifactId>thumbnailator</artifactId>
+    		<version>0.4.8</version>
+		</dependency>
 	</dependencies>
+
 
 	<build>
 		<resources>
@@ -78,4 +85,5 @@
 
 		</plugins>
 	</build>
+   
 </project>

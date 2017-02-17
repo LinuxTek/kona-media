@@ -12,6 +12,7 @@ import java.awt.image.BufferedImageOp;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -22,9 +23,12 @@ import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
 
 import org.apache.log4j.Logger;
+
 import org.imgscalr.Scalr;
 
 import com.linuxtek.kona.util.KFileUtil;
+
+import net.coobird.thumbnailator.Thumbnails;
 
 public class KImageUtil {
     private static Logger logger = Logger.getLogger(KImageUtil.class);
@@ -59,7 +63,38 @@ public class KImageUtil {
                 RenderingHints.VALUE_INTERPOLATION_BICUBIC, true));
     } 
 
+    public static byte[] toByteArray(BufferedImage image, String formatName) throws IOException {
+        ByteArrayOutputStream os = new ByteArrayOutputStream();
+        
+        ImageIO.write(image, formatName, os);
+        byte[] resultBytes = os.toByteArray();
+        os.close();
 
+        return resultBytes;
+    }
+
+    public static BufferedImage getRotatedImage(BufferedImage image) throws IOException {
+        return Thumbnails.of(image).scale(1).asBufferedImage();
+    }
+
+    public static byte[] getRotatedImage(InputStream in) throws IOException {
+        BufferedImage image = ImageIO.read(in);
+
+        if (image == null) {
+            logger.error("ImageIO.read failed.");
+        }
+
+        BufferedImage result = getRotatedImage(image);
+        String formatName = getFormatName(in);
+        in.close();
+        return toByteArray(result, formatName);
+    }
+    
+
+    public static byte[] getRotatedImage(byte[] data) throws IOException {
+        ByteArrayInputStream in = new ByteArrayInputStream(data);
+        return getRotatedImage(in);
+    }
 
     public static BufferedImage getScaledInstance(
             BufferedImage img,
