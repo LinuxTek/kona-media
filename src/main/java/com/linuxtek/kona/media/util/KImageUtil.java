@@ -73,27 +73,36 @@ public class KImageUtil {
         return resultBytes;
     }
 
+    // http://chunter.tistory.com/143
+    // http://stackoverflow.com/questions/5905868/how-to-rotate-jpeg-images-based-on-the-orientation-metadata
+    // https://github.com/coobird/thumbnailator
     public static BufferedImage getRotatedImage(BufferedImage image) throws IOException {
         return Thumbnails.of(image).scale(1).asBufferedImage();
     }
 
-    public static byte[] getRotatedImage(InputStream in) throws IOException {
+    public static byte[] getRotatedImage(InputStream in, String formatName) throws IOException {
         BufferedImage image = ImageIO.read(in);
+        in.close();
 
         if (image == null) {
-            logger.error("ImageIO.read failed.");
+            throw new IOException("ImageIO.read failed.");
         }
 
-        BufferedImage result = getRotatedImage(image);
-        String formatName = getFormatName(in);
-        in.close();
-        return toByteArray(result, formatName);
+        if (formatName == null) {
+            throw new NullPointerException("formatName is null for InputStream");
+        }
+
+
+        image = getRotatedImage(image);
+
+        return toByteArray(image, formatName);
     }
     
 
     public static byte[] getRotatedImage(byte[] data) throws IOException {
+        String formatName = getFormatName(data);
         ByteArrayInputStream in = new ByteArrayInputStream(data);
-        return getRotatedImage(in);
+        return getRotatedImage(in, formatName);
     }
 
     public static BufferedImage getScaledInstance(
