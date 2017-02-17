@@ -143,9 +143,9 @@ public class KImageUtil {
 
         Graphics2D g = destinationImage.createGraphics();
 
-        //g.setBackground(Color.WHITE);
-        Color transparent = new Color(0,0,0,0);
-        g.setBackground(transparent);
+        g.setBackground(Color.WHITE);
+        //Color transparent = new Color(0,0,0,0);
+        //g.setBackground(transparent);
 
         g.clearRect(0, 0, destinationImage.getWidth(), destinationImage.getHeight());
 
