@@ -7,6 +7,8 @@ import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.Transparency;
+import java.awt.geom.AffineTransform;
+import java.awt.image.AffineTransformOp;
 import java.awt.image.BufferedImage;
 import java.awt.image.BufferedImageOp;
 import java.io.ByteArrayInputStream;
@@ -26,6 +28,13 @@ import org.apache.log4j.Logger;
 
 import org.imgscalr.Scalr;
 
+import com.drew.imaging.ImageMetadataReader;
+import com.drew.imaging.ImageProcessingException;
+import com.drew.metadata.Directory;
+import com.drew.metadata.Metadata;
+import com.drew.metadata.MetadataException;
+import com.drew.metadata.exif.ExifIFD0Directory;
+import com.drew.metadata.jpeg.JpegDirectory;
 import com.linuxtek.kona.util.KFileUtil;
 
 import net.coobird.thumbnailator.Thumbnails;
@@ -73,36 +82,88 @@ public class KImageUtil {
         return resultBytes;
     }
 
-    // http://chunter.tistory.com/143
     // http://stackoverflow.com/questions/5905868/how-to-rotate-jpeg-images-based-on-the-orientation-metadata
     // https://github.com/coobird/thumbnailator
+    /*
     public static BufferedImage getRotatedImage(BufferedImage image) throws IOException {
-        return Thumbnails.of(image).scale(1).asBufferedImage();
+        //return Thumbnails.of(image).scale(1).asBufferedImage();
+        Metadata metadata = ImageMetadataReader.readMetadata(imagePath);
     }
+    */
+    
+    // http://chunter.tistory.com/143
+    // http://stackoverflow.com/questions/5905868/how-to-rotate-jpeg-images-based-on-the-orientation-metadata
+    public static AffineTransform getExifTransformation(Image image) {
 
-    public static byte[] getRotatedImage(InputStream in, String formatName) throws IOException {
-        BufferedImage image = ImageIO.read(in);
-        in.close();
+        AffineTransform t = new AffineTransform();
 
-        if (image == null) {
-            throw new IOException("ImageIO.read failed.");
+        switch (image.orientation) {
+        case 1:
+            break;
+        case 2: // Flip X
+            t.scale(-1.0, 1.0);
+            t.translate(-image.width, 0);
+            break;
+        case 3: // PI rotation 
+            t.translate(image.width, image.height);
+            t.rotate(Math.PI);
+            break;
+        case 4: // Flip Y
+            t.scale(1.0, -1.0);
+            t.translate(0, -image.height);
+            break;
+        case 5: // - PI/2 and Flip X
+            t.rotate(-Math.PI / 2);
+            t.scale(-1.0, 1.0);
+            break;
+        case 6: // -PI/2 and -width
+            t.translate(image.height, 0);
+            t.rotate(Math.PI / 2);
+            break;
+        case 7: // PI/2 and Flip
+            t.scale(-1.0, 1.0);
+            t.translate(-image.height, 0);
+            t.translate(0, image.width);
+            t.rotate(  3 * Math.PI / 2);
+            break;
+        case 8: // PI / 2
+            t.translate(0, image.width);
+            t.rotate(  3 * Math.PI / 2);
+            break;
         }
 
-        if (formatName == null) {
-            throw new NullPointerException("formatName is null for InputStream");
-        }
-
-
-        image = getRotatedImage(image);
-
-        return toByteArray(image, formatName);
+        return t;
     }
     
+    public static BufferedImage transformImage(BufferedImage image, AffineTransform transform) {
 
-    public static byte[] getRotatedImage(byte[] data) throws IOException {
+        AffineTransformOp op = new AffineTransformOp(transform, AffineTransformOp.TYPE_BICUBIC);
+
+        BufferedImage destinationImage = op.createCompatibleDestImage(image, (image.getType() == BufferedImage.TYPE_BYTE_GRAY) ? image.getColorModel() : null );
+
+        Graphics2D g = destinationImage.createGraphics();
+
+        //g.setBackground(Color.WHITE);
+        Color transparent = new Color(0,0,0,0);
+        g.setBackground(transparent);
+
+        g.clearRect(0, 0, destinationImage.getWidth(), destinationImage.getHeight());
+
+        destinationImage = op.filter(image, destinationImage);
+
+        return destinationImage;
+    }
+ 
+    
+    public static byte[] getNormalizedImage(byte[] data) throws IOException {
         String formatName = getFormatName(data);
         ByteArrayInputStream in = new ByteArrayInputStream(data);
-        return getRotatedImage(in, formatName);
+        BufferedImage image = ImageIO.read(in);
+        
+        Image info = toImage(data);
+        AffineTransform transform = getExifTransformation(info);
+        image = transformImage(image, transform);
+        return toByteArray(image, formatName);
     }
 
     public static BufferedImage getScaledInstance(
@@ -234,6 +295,7 @@ public class KImageUtil {
 		public byte[] data;
     	public Integer width;
     	public Integer height;
+    	public Integer orientation;
     	public Long size;
     	public Integer bitsPerPixel;
     	public String contentType;
@@ -294,12 +356,35 @@ public class KImageUtil {
         Image image = new Image();
 
         KImageInfo info = new KImageInfo(data);
+
         image.data = data;
         image.width = info.getWidth();
         image.height = info.getHeight();
         image.bitsPerPixel = info.getBitsPerPixel();
         image.contentType = info.getMimeType();
         image.size = Long.valueOf(data.length);
+        
+        ByteArrayInputStream in = new ByteArrayInputStream(data);
+        
+        try {
+            Metadata metadata = ImageMetadataReader.readMetadata(in);
+            Directory directory = metadata.getFirstDirectoryOfType(ExifIFD0Directory.class);
+            JpegDirectory jpegDirectory = metadata.getFirstDirectoryOfType(JpegDirectory.class);
+
+            image.orientation = directory.getInt(ExifIFD0Directory.TAG_ORIENTATION);
+            int width = jpegDirectory.getImageWidth();
+            int height = jpegDirectory.getImageHeight();
+            
+            if (image.width == null || image.width != width) {
+                image.width = width;
+            }
+
+            if (image.height == null || image.height != height) {
+                image.height = height;
+            }
+        } catch (MetadataException | ImageProcessingException e) {
+            logger.warn("Could not get orientation");
+        }
 
         return image;
     }
