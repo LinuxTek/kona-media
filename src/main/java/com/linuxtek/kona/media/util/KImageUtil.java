@@ -35,6 +35,8 @@ import com.drew.metadata.Metadata;
 import com.drew.metadata.MetadataException;
 import com.drew.metadata.exif.ExifIFD0Directory;
 import com.drew.metadata.jpeg.JpegDirectory;
+import com.linuxtek.kona.media.model.KImage;
+import com.linuxtek.kona.media.model.KOrientation;
 import com.linuxtek.kona.util.KFileUtil;
 
 import net.coobird.thumbnailator.Thumbnails;
@@ -76,10 +78,20 @@ public class KImageUtil {
         ByteArrayOutputStream os = new ByteArrayOutputStream();
         
         ImageIO.write(image, formatName, os);
-        byte[] resultBytes = os.toByteArray();
+        byte[] data = os.toByteArray();
         os.close();
 
-        return resultBytes;
+        return data;
+    }
+    
+    public static KImage toImage(BufferedImage image, String formatName) throws IOException {
+        ByteArrayOutputStream os = new ByteArrayOutputStream();
+        
+        ImageIO.write(image, formatName, os);
+        byte[] data = os.toByteArray();
+        os.close();
+
+        return toImage(data);
     }
 
     // http://stackoverflow.com/questions/5905868/how-to-rotate-jpeg-images-based-on-the-orientation-metadata
@@ -93,63 +105,93 @@ public class KImageUtil {
     
     // http://chunter.tistory.com/143
     // http://stackoverflow.com/questions/5905868/how-to-rotate-jpeg-images-based-on-the-orientation-metadata
-    public static AffineTransform getExifTransformation(Image image) {
+    public static AffineTransform getExifTransformation(KImage image) {
+        
+        if (image == null || image.getOrientation() == null) {
+            throw new IllegalArgumentException("Image and Orientation must be set: " + image);
+        }
 
         AffineTransform t = new AffineTransform();
 
-        switch (image.orientation) {
-        case 1:
-            break;
-        case 2: // Flip X
-            t.scale(-1.0, 1.0);
-            t.translate(-image.width, 0);
-            break;
-        case 3: // PI rotation 
-            t.translate(image.width, image.height);
-            t.rotate(Math.PI);
-            break;
-        case 4: // Flip Y
-            t.scale(1.0, -1.0);
-            t.translate(0, -image.height);
-            break;
-        case 5: // - PI/2 and Flip X
-            t.rotate(-Math.PI / 2);
-            t.scale(-1.0, 1.0);
-            break;
-        case 6: // -PI/2 and -width
-            t.translate(image.height, 0);
-            t.rotate(Math.PI / 2);
-            break;
-        case 7: // PI/2 and Flip
-            t.scale(-1.0, 1.0);
-            t.translate(-image.height, 0);
-            t.translate(0, image.width);
-            t.rotate(  3 * Math.PI / 2);
-            break;
-        case 8: // PI / 2
-            t.translate(0, image.width);
-            t.rotate(  3 * Math.PI / 2);
-            break;
+        switch (image.getOrientation().value()) {
+            case 1:
+                break;
+
+            case 2: // Flip X
+                t.scale(-1.0, 1.0);
+                t.translate(-image.getWidth(), 0);
+                break;
+
+            case 3: // PI rotation 
+                t.translate(image.getWidth(), image.getHeight());
+                t.rotate(Math.PI);
+                break;
+
+            case 4: // Flip Y
+                t.scale(1.0, -1.0);
+                t.translate(0, -image.getHeight());
+                break;
+
+            case 5: // - PI/2 and Flip X
+                t.rotate(-Math.PI / 2);
+                t.scale(-1.0, 1.0);
+                break;
+
+            case 6: // -PI/2 and -width
+                t.translate(image.getHeight(), 0);
+                t.rotate(Math.PI / 2);
+                break;
+
+            case 7: // PI/2 and Flip
+                t.scale(-1.0, 1.0);
+                t.translate(-image.getHeight(), 0);
+                t.translate(0, image.getWidth());
+                t.rotate(  3 * Math.PI / 2);
+                break;
+
+            case 8: // PI / 2
+                t.translate(0, image.getWidth());
+                t.rotate(  3 * Math.PI / 2);
+                break;
         }
 
         return t;
     }
     
     
-    protected static BufferedImage createOptimalImage(BufferedImage src,
-            int width, int height) throws IllegalArgumentException {
-        if (width < 0 || height < 0)
+    protected static BufferedImage createOptimalImage(BufferedImage src, int width, int height) 
+            throws IllegalArgumentException {
+
+        if (width < 0 || height < 0) {
             throw new IllegalArgumentException("width [" + width
                     + "] and height [" + height + "] must be >= 0");
+        }
 
-        return new BufferedImage(
-                width,
-                height,
-                (src.getTransparency() == Transparency.OPAQUE ? BufferedImage.TYPE_INT_RGB
-                        : BufferedImage.TYPE_INT_ARGB));
+        return new BufferedImage(width, height,
+                (src.getTransparency() == Transparency.OPAQUE 
+                ? BufferedImage.TYPE_INT_RGB
+                : BufferedImage.TYPE_INT_ARGB));
     }
 
     public static BufferedImage transformImage(BufferedImage image, AffineTransform transform) {
+        AffineTransformOp op = new AffineTransformOp(transform, null);
+        BufferedImage destImage = op.createCompatibleDestImage(image, image.getColorModel());
+        Graphics2D g2d = destImage.createGraphics();
+        g2d.drawImage(image, transform, null);
+        g2d.dispose();
+        return destImage;
+        
+        /*
+        Graphics2D g = destinationImage.createGraphics();
+        g.setBackground(Color.WHITE);
+        g.clearRect(0, 0, destinationImage.getWidth(), destinationImage.getHeight());
+        destinationImage = op.filter(image, destinationImage);
+        return destinationImage;
+        */
+    }
+
+
+    public static BufferedImage transformImage2(BufferedImage image, AffineTransform transform) {
 
 
         /*
@@ -160,11 +202,11 @@ public class KImageUtil {
 
         Graphics2D g = destinationImage.createGraphics();
 
-        g.setBackground(Color.WHITE);
+g.setBackground(Color.WHITE);
         //Color transparent = new Color(0,0,0,0);
         //g.setBackground(transparent);
 
-        g.clearRect(0, 0, destinationImage.getWidth(), destinationImage.getHeight());
+g.clearRect(0, 0, destinationImage.getWidth(), destinationImage.getHeight());
         */
         
         /*
@@ -204,15 +246,15 @@ public class KImageUtil {
     }
  
     
-    public static byte[] getNormalizedImage(byte[] data) throws IOException {
+    public static KImage getNormalizedImage(byte[] data) throws IOException {
         String formatName = getFormatName(data);
         ByteArrayInputStream in = new ByteArrayInputStream(data);
         BufferedImage image = ImageIO.read(in);
         
-        Image info = toImage(data);
+        KImage info = toImage(data);
         AffineTransform transform = getExifTransformation(info);
         image = transformImage(image, transform);
-        return toByteArray(image, formatName);
+        return toImage(image, formatName);
     }
 
     public static BufferedImage getScaledInstance(
@@ -316,8 +358,7 @@ public class KImageUtil {
     }
 
     // return data, width, height
-    public static Image resize(byte[] src, int targetWidth, 
-            int targetHeight) throws IOException {
+    public static KImage resize(byte[] src, int targetWidth, int targetHeight) throws IOException {
         ByteArrayInputStream is = new ByteArrayInputStream(src);
 
         BufferedImage image = ImageIO.read(is);
@@ -339,18 +380,8 @@ public class KImageUtil {
         return toImage(resultBytes);
     }
     
-    public static class Image implements Serializable {
-		private static final long serialVersionUID = 2475935877346904537L;
-		public byte[] data;
-    	public Integer width;
-    	public Integer height;
-    	public Integer orientation;
-    	public Long size;
-    	public Integer bitsPerPixel;
-    	public String contentType;
-    }
-    
-	public static Image resizeToMaxWidthAndHeight(byte[] src, 
+ 
+	public static KImage resizeToMaxWidthAndHeight(byte[] src, 
 			int maxWidth, int maxHeight ) throws IOException {
 		logger.debug("resizeToMaxWidthAndHeight: maxWidth: " + maxWidth + "  maxHeight: " + maxHeight);
         
@@ -384,7 +415,7 @@ public class KImageUtil {
             newWidth = (int)(width * ratio);
 		}
         
-		Image image = null;
+		KImage image = null;
 
 		if (newWidth>0 && newHeight>0) {
 			image = resize(src, newWidth, newHeight);
@@ -395,41 +426,54 @@ public class KImageUtil {
         logger.debug("resizeToMaxWidthAndHeight: " 
         		+ "\nwidth: " + width
         		+ "\nheight: " + height
-        		+ "\nnewWidth: " + image.width
-        		+ "\nnewHeight: " + image.height);
+        		+ "\nnewWidth: " + image.getWidth()
+        		+ "\nnewHeight: " + image.getHeight());
         
         return image;
 	}
     
-    public static Image toImage(byte[] data) throws IOException {
-        Image image = new Image();
+    public static KImage toImage(byte[] data) throws IOException {
+        KImage image = new KImage();
 
         KImageInfo info = new KImageInfo(data);
+        
+        image.setData(data);
+        image.setWidth(info.getWidth());
+        image.setHeight(info.getHeight());
+        image.setBitsPerPixel(info.getBitsPerPixel());
+        image.setContentType(info.getMimeType());
+        image.setSize(Long.valueOf(data.length));
 
-        image.data = data;
-        image.width = info.getWidth();
-        image.height = info.getHeight();
-        image.bitsPerPixel = info.getBitsPerPixel();
-        image.contentType = info.getMimeType();
-        image.size = Long.valueOf(data.length);
-        
+
         ByteArrayInputStream in = new ByteArrayInputStream(data);
-        
+
         try {
             Metadata metadata = ImageMetadataReader.readMetadata(in);
-            Directory directory = metadata.getFirstDirectoryOfType(ExifIFD0Directory.class);
-            JpegDirectory jpegDirectory = metadata.getFirstDirectoryOfType(JpegDirectory.class);
 
-            image.orientation = directory.getInt(ExifIFD0Directory.TAG_ORIENTATION);
-            int width = jpegDirectory.getImageWidth();
-            int height = jpegDirectory.getImageHeight();
-            
-            if (image.width == null || image.width != width) {
-                image.width = width;
+            Directory directory = metadata.getFirstDirectoryOfType(ExifIFD0Directory.class);
+
+            if (directory != null) {
+                KOrientation orientation = 
+                        KOrientation.getInstance(directory.getInt(ExifIFD0Directory.TAG_ORIENTATION));
+
+                image.setOrientation(orientation);
             }
 
-            if (image.height == null || image.height != height) {
-                image.height = height;
+            JpegDirectory jpegDirectory = metadata.getFirstDirectoryOfType(JpegDirectory.class);
+
+            if (jpegDirectory != null) {
+
+
+                Integer width = jpegDirectory.getImageWidth();
+                Integer height = jpegDirectory.getImageHeight();
+
+                if (image.getWidth() == null || !image.getWidth().equals(width)) {
+                    image.setWidth(width);
+                }
+
+                if (image.getHeight() == null || !image.getHeight().equals(height)) {
+                    image.setHeight(height);
+                }
             }
         } catch (MetadataException | ImageProcessingException e) {
             logger.warn("Could not get orientation");
@@ -566,7 +610,7 @@ public class KImageUtil {
         return formatName;
     }
 
-	public static byte[] crop(byte[] data, int x, int y, int w, int h) 
+	public static KImage crop(byte[] data, int x, int y, int w, int h) 
 			throws IOException {
 		ByteArrayInputStream is = new ByteArrayInputStream(data);
 		BufferedImage image = ImageIO.read(is);
@@ -581,7 +625,9 @@ public class KImageUtil {
 
 		ImageIO.write(out, formatName, os);
 
-		return os.toByteArray();
+		data = os.toByteArray();
+		
+		return new KImage(data, contentType, w, h);
 	}
     
     /*
