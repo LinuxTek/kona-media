@@ -108,7 +108,7 @@ public class KImageUtil {
     public static AffineTransform getExifTransformation(KImage image) {
         
         if (image == null || image.getOrientation() == null) {
-            throw new IllegalArgumentException("Image and Orientation must be set: " + image);
+            return null;
         }
 
         AffineTransform t = new AffineTransform();
@@ -247,14 +247,24 @@ g.clearRect(0, 0, destinationImage.getWidth(), destinationImage.getHeight());
  
     
     public static KImage getNormalizedImage(byte[] data) throws IOException {
-        String formatName = getFormatName(data);
-        ByteArrayInputStream in = new ByteArrayInputStream(data);
-        BufferedImage image = ImageIO.read(in);
-        
-        KImage info = toImage(data);
-        AffineTransform transform = getExifTransformation(info);
-        image = transformImage(image, transform);
-        return toImage(image, formatName);
+
+        KImage result = toImage(data);
+
+        AffineTransform transform = getExifTransformation(result);
+
+        if (transform != null) {
+            String formatName = getFormatName(data);
+
+            ByteArrayInputStream in = new ByteArrayInputStream(data);
+
+            BufferedImage image = ImageIO.read(in);
+
+            image = transformImage(image, transform);
+
+            result = toImage(image, formatName);
+        }
+
+        return result;
     }
 
     public static BufferedImage getScaledInstance(
